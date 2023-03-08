@@ -17,6 +17,81 @@ rng_states = create_xoroshiro128p_states(1, seed=tseed)
 minUtility = 1100000
 pop_size = 100
 
+def read1(filepath):
+    ''' # 读入filepath(.txt)
+        return  tmp_line, eachline_lenth, eachline_twu
+        - 均为list[int]'''
+    f= open(filepath)
+    line = f.readline()
+    tmp_line= []
+    tmp_num = []
+    eachline_lenth = []
+    eachline_twu = []
+    n = 0
+    twu_flag = 0 # 判断是否为twu的flag
+    while line:
+        for i in line:
+            # print(i)
+            if i.isdigit():
+                tmp_num.append(i)
+            elif i == ':' and twu_flag == 0:
+                # 加入: 前一个数
+                tmp_line.append(int(''.join(tmp_num)))
+                tmp_num=[]
+                n += 1
+                eachline_lenth.append(n)
+                twu_flag = 1
+                continue
+            elif i == ':' and twu_flag == 1:
+                eachline_twu.append(int(''.join(tmp_num)))
+                tmp_num=[]
+                twu_flag = 0
+                n = 0
+                break
+            else:
+                # print(tmp_num)
+                tmp_line.append(int(''.join(tmp_num)))
+                tmp_num=[]
+                n += 1
+        line = f.readline()    
+        # print(line,end = '')  # end = ''表示不换行
+    # print(line)  # 默认换行
+    
+    f.close()
+    return tmp_line,eachline_lenth,eachline_twu
+
+def read2(filepath):
+    ''' Return eachitem_twu
+        type -> list[int]'''
+    f= open(filepath)
+    line = f.readline()
+    tmp_line= []
+    tmp_num = []
+    twu_flag = 0
+    while line:
+        for i in line:
+            # print(i)
+            if i.isdigit() and twu_flag == 2:
+                tmp_num.append(i)
+            elif i == ':' and twu_flag == 0:
+                # 加入: 前一个数
+                twu_flag = 1
+                continue
+            elif i == ':' and twu_flag == 1:
+                twu_flag = 2
+                continue
+            elif i == ' ' and twu_flag == 2:
+                # print(tmp_num)
+                tmp_line.append(int(''.join(tmp_num)))
+                tmp_num=[]
+            if i == "\n":
+                tmp_line.append(int(''.join(tmp_num)))
+                tmp_num=[]
+                twu_flag = 0
+        line = f.readline()  
+    f.close()
+    return tmp_line
+
 @jit(nopython = True) #  = @njit
 def BinarySearch(accumulative_value, key, chrom_len):
     '''返回满足 = key的 个体染色体位置'''
@@ -211,4 +286,9 @@ def parrallel_map_process(database_gpu,hash_sort_gpu,eachline_length_gpu,start_p
 
 
 if __name__ == '__main__':
+    datapath = './fruithut_utility_sort.txt'
+    items_list, eachline_len, eachline_twu = read1(datapath)
+    eachitem_utility = read2(datapath)
+    # print(len(items_list) - len(eachitem_utility))
     print('Begin!!! \n')
+    
