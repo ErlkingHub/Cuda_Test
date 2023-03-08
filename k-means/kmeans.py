@@ -1,5 +1,5 @@
 # from math import sqrt
-from config import *
+from configg import *
 import numba
 from numba import cuda
 import numpy as np
