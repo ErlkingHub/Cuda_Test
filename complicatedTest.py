@@ -1,6 +1,7 @@
 ''' This is a more complicated trial for numba.cuda.
     Aiming to make a comparision for cuda-C'''
 
+import math
 import numpy as np
 from numba import cuda,jit,njit
 
@@ -8,14 +9,19 @@ from numba import cuda,jit,njit
 import random
 from numba.cuda.random import init_xoroshiro128p_states, create_xoroshiro128p_states, xoroshiro128p_uniform_float32
 
+from timeit import default_timer as de_timer
 
 # Global const Variables
 tseed = 21
 random.seed(tseed)
 rng_states = create_xoroshiro128p_states(1, seed=tseed)
 
-minUtility = 1100000
+minUtility = 60000
 pop_size = 100
+chrom_len = 0
+hash1 = np.zeros(100000)
+hash_item = np.zeros(100000)
+hash_twu = np.zeros(100000)
 
 def read1(filepath):
     ''' # 读入filepath(.txt)
@@ -53,14 +59,22 @@ def read1(filepath):
                 tmp_line.append(int(''.join(tmp_num)))
                 tmp_num=[]
                 n += 1
-        line = f.readline()    
-        # print(line,end = '')  # end = ''表示不换行
-    # print(line)  # 默认换行
-    
+        # for i in range(n):
+        #     if hash1[tmp_line[i]] + eachline_twu[-1] < 0:
+        #         hash1[tmp_line[i]] = -1
+        #     else:
+        #         hash1[tmp_line[i]] += eachline_twu[-1]
+        line = f.readline()
+    # for i in range(len(hash1)):
+    #     if hash1[i]>= minUtility:
+    #         hash_item[i] = 1
+    #         hash_twu[i] = hash1[i]
+    #         chrom_len+=1
+        
     f.close()
     return tmp_line,eachline_lenth,eachline_twu
 
-def read2(filepath):
+def read2(filepath, eachline_twu):
     ''' Return eachitem_twu
         type -> list[int]'''
     f= open(filepath)
@@ -88,7 +102,19 @@ def read2(filepath):
                 tmp_line.append(int(''.join(tmp_num)))
                 tmp_num=[]
                 twu_flag = 0
+        j = 0
+        for i in range(len(tmp_line)):
+            if hash1[tmp_line[i]] + eachline_twu[j] < 0:
+                hash1[tmp_line[i]] = -1
+            else:
+                hash1[tmp_line[i]] += eachline_twu[j]
+            j+=1
         line = f.readline()  
+    for i in range(len(hash1)):
+        if hash1[i]>= minUtility:
+            hash_item[i] = 1
+            hash_twu[i] = hash1[i]
+            chrom_len+=1
     f.close()
     return tmp_line
 
@@ -288,7 +314,16 @@ def parrallel_map_process(database_gpu,hash_sort_gpu,eachline_length_gpu,start_p
 if __name__ == '__main__':
     datapath = './fruithut_utility_sort.txt'
     items_list, eachline_len, eachline_twu = read1(datapath)
-    eachitem_utility = read2(datapath)
+    eachitem_utility = read2(datapath,eachline_twu)
     # print(len(items_list) - len(eachitem_utility))
     print('Begin!!! \n')
+    start1 = de_timer()
+
+    items_list_device = cuda.to_device(items_list)
+    eachline_len_device = cuda.to_device(eachline_len)
+    eachline_twu_device = cuda.to_device(eachline_twu)
+    eachitem_utility_device = cuda.to_device(eachitem_utility)
     
+    threads_per_block = 1024
+    blocks_per_grid = math.ceil(len(items_list)/threads_per_block)
+    init_population[1, pop_size]()
