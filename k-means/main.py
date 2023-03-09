@@ -51,7 +51,7 @@ def runKmeans(arrayP, arrayPclusters,
 
 def main():
     # 从json文件中读取数据集
-    with open("../points.json") as f:
+    with open("./points.json") as f:
         listPoints = list(map(lambda x: (x[0], x[1]), json.loads(f.read())))
 
     # 初始化变量
