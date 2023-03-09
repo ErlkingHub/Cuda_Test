@@ -3,8 +3,9 @@ from configg import *
 import numba
 from numba import cuda
 import numpy as np
+from math import ceil
 
-@numba.jit(nopython=True)
+@cuda.jit
 def groupByCluster(arrayP, arrayPcluster,
                    arrayC,
                    num_points, num_centroids, tmp_result):
@@ -20,23 +21,28 @@ def groupByCluster(arrayP, arrayPcluster,
     # x = cuda.threadIdx.x
     # bx = cuda.blockIdx.x
     # bdx = cuda.blockDim.x
+    minor_distance = -1
     if idx < num_points:
-        dx_list = arrayP[idx,0] - arrayC[:,0]
-        dy_list = arrayP[idx,1] - arrayC[:,1]
-    tmp_result = np.multiply(dx_list, dx_list) + np.multiply(dy_list, dy_list)
-    return tmp_result
+        for i in range(num_centroids):
+            dx_list = arrayP[idx,0] - arrayC[i,0]
+            dy_list = arrayP[idx,1] - arrayC[i,1]
+        # tmp_result = dx_list * dx_list + dy_list * dy_list
+            my_disList = np.sqrt(dx_list * dx_list + dy_list * dy_list)
+        # for i in range(num_centroids):
+            if minor_distance > my_disList or minor_distance == -1:
+                    minor_distance = my_disList
+                    arrayPcluster[idx] = i
+        return arrayPcluster
+    # return tmp_result
 
-@numba.jit(nopython=True)
+@cuda.jit
 def groupByCluster2(tmp_result, arrayPcluster):
     idx = cuda.threadIdx.x + cuda.blockDim.x * cuda.blockIdx.x
     minor_distance = -1
-    my_disList = np.sqrt(tmp_result)
-    if idx < len(arrayPcluster):
-        for i in range(10):
-            if minor_distance > my_disList[idx] or minor_distance == -1:
-                    minor_distance = my_disList[idx]
-                    arrayPcluster[idx] = i
-    return arrayPcluster
+    
+    # if idx < len(arrayPcluster):
+        
+    
     # for i0 in range(num_points):
     #     # 使用负数初始化当前聚类的最短距离
     #     minor_distance = -1
@@ -114,15 +120,21 @@ def kmeans(arrayP, arrayPcluster,
         num_points = 10w
         num_centroids = 10
     '''
+    threads_per_block = 1024
+    blocks_per_grid = ceil(num_points / threads_per_block)
+    print(blocks_per_grid)
+    print(blocks_per_grid* threads_per_block)
     tmp_result = cuda.device_array(num_centroids)
     for i in range(ITERATIONS):
-        groupByCluster(
+        groupByCluster[blocks_per_grid, threads_per_block](
             arrayP, arrayPcluster,
             arrayC,
             num_points, num_centroids, tmp_result
         )
-        groupByCluster2(tmp_result, arrayPcluster)
-
+        # groupByCluster2[blocks_per_grid, threads_per_block](tmp_result, arrayPcluster)
+        cuda.synchronize()
+        print(arrayPcluster[0:100])
+        
         calCentroidsSum(
             arrayP, arrayPcluster,
             arrayCsum, arrayCnumpoint,
