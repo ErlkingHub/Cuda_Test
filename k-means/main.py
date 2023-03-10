@@ -27,6 +27,7 @@ def runKmeans(arrayP, arrayPclusters,
     start = time()
 
     for i in range(REPEAT):
+        # start = time()
         # 使用点对象中的前k个点初始化聚类
         for i1 in range(NUMBER_OF_CENTROIDS):
             arrayC[i1, 0] = arrayP[i1, 0]
@@ -38,8 +39,12 @@ def runKmeans(arrayP, arrayPclusters,
             NUMBER_OF_POINTS, NUMBER_OF_CENTROIDS
         )
 
-        if i + 1 == REPEAT:
-            printCentroid(arrayC, arrayCsum, arrayCnumpoint)
+        # if i + 1 == REPEAT:
+        #     printCentroid(arrayC, arrayCsum, arrayCnumpoint)
+        
+        # end = time()
+        # total = (end - start) * 1000
+        # print("Average Time: {:.4f} ms".format(total))
 
     # 结束计时
     end = time()
@@ -55,12 +60,12 @@ def main():
         listPoints = list(map(lambda x: (x[0], x[1]), json.loads(f.read())))
 
     # 初始化变量
-    arrayP = np.ones((NUMBER_OF_POINTS, 2), dtype=np.float32)
-    arrayPclusters = np.ones(NUMBER_OF_POINTS, dtype=np.int32)
+    arrayP = np.zeros((NUMBER_OF_POINTS, 2), dtype=np.float32)
+    arrayPclusters = np.zeros(NUMBER_OF_POINTS, dtype=np.int32)
 
-    arrayC = np.ones((NUMBER_OF_CENTROIDS, 2), dtype=np.float32)
-    arrayCsum = np.ones((NUMBER_OF_CENTROIDS, 2), dtype=np.float32)
-    arrayCnumpoint = np.ones(NUMBER_OF_CENTROIDS, dtype=np.int32)
+    arrayC = np.zeros((NUMBER_OF_CENTROIDS, 2), dtype=np.float32)
+    arrayCsum = np.zeros((NUMBER_OF_CENTROIDS, 2), dtype=np.float32)
+    arrayCnumpoint = np.zeros(NUMBER_OF_CENTROIDS, dtype=np.int32)
 
     # 初始化点对象
     for i, d in enumerate(listPoints):

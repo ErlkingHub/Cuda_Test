@@ -1,14 +1,16 @@
 # from math import sqrt
+import math
+from time import time
 from configg import *
 import numba
 from numba import cuda
 import numpy as np
 from math import ceil
 
-@cuda.jit
+@cuda.jit()
 def groupByCluster(arrayP, arrayPcluster,
-                   arrayC,
-                   num_points, num_centroids, tmp_result):
+                   arrayC, arrayCsum, arrayCnumpoint,
+                   num_points, num_centroids):
     '''
         分配聚类
         arrayP        -> (10w,2)
@@ -27,16 +29,24 @@ def groupByCluster(arrayP, arrayPcluster,
             dx_list = arrayP[idx,0] - arrayC[i,0]
             dy_list = arrayP[idx,1] - arrayC[i,1]
         # tmp_result = dx_list * dx_list + dy_list * dy_list
-            my_disList = np.sqrt(dx_list * dx_list + dy_list * dy_list)
+            my_disList = math.sqrt(dx_list * dx_list + dy_list * dy_list)
         # for i in range(num_centroids):
             if minor_distance > my_disList or minor_distance == -1:
                     minor_distance = my_disList
                     arrayPcluster[idx] = i
-        return arrayPcluster
+        
+        # calCentroidsSum
+        ci = arrayPcluster[idx]
+        arrayCsum[ci, 0] += arrayP[idx, 0]
+        arrayCsum[ci, 1] += arrayP[idx, 1]
+        arrayCnumpoint[ci] += 1
+        
+        # updateCentroids
+        # return arrayPcluster
     # return tmp_result
 
 @cuda.jit
-def groupByCluster2(tmp_result, arrayPcluster):
+def groupByCluster2(arrayPcluster):
     idx = cuda.threadIdx.x + cuda.blockDim.x * cuda.blockIdx.x
     minor_distance = -1
     
@@ -73,10 +83,10 @@ def calCentroidsSum(arrayP, arrayPcluster,
     num_centroids = 10
     '''
     # 初始化聚类的总值信息
-    for i in range(num_centroids):
-        arrayCsum[i, 0] = 0
-        arrayCsum[i, 1] = 0
-        arrayCnumpoint[i] = 0
+    # for i in range(num_centroids):
+    #     arrayCsum[i, 0] = 0
+    #     arrayCsum[i, 1] = 0
+    #     arrayCnumpoint[i] = 0
 
     # 根据每个点对象所在的聚类，对聚类的总值信息进行更新
     for i in range(num_points):
@@ -100,6 +110,7 @@ def updateCentroids(arrayC, arrayCsum, arrayCnumpoint,
     num_points = 10w
     num_centroids = 10
     '''
+    
     for i in range(num_centroids):
         # 对已经计算好总值信息的聚类，计算其均值信息
         arrayC[i, 0] = arrayCsum[i, 0] / arrayCnumpoint[i]
@@ -107,8 +118,8 @@ def updateCentroids(arrayC, arrayCsum, arrayCnumpoint,
 
 
 
-def kmeans(arrayP, arrayPcluster,
-           arrayC, arrayCsum, arrayCnumpoint,
+def kmeans(arrayP_host, arrayPcluster_host,
+           arrayC_host, arrayCsum_host, arrayCnumpoint_host,
            num_points, num_centroids):
     '''
         kmeans辅助代码
@@ -120,30 +131,45 @@ def kmeans(arrayP, arrayPcluster,
         num_points = 10w
         num_centroids = 10
     '''
-    threads_per_block = 1024
-    blocks_per_grid = ceil(num_points / threads_per_block)
-    print(blocks_per_grid)
-    print(blocks_per_grid* threads_per_block)
-    tmp_result = cuda.device_array(num_centroids)
+    
+    arrayP = cuda.to_device(arrayP_host)
+    arrayPcluster = cuda.to_device(arrayPcluster_host)
+    arrayC = cuda.to_device(arrayC_host)
+    arrayCsum = cuda.to_device(arrayCsum_host)
+    arrayCnumpoint = cuda.to_device(arrayCnumpoint_host)
+
+    # start = time()
+    
+    # print(threads_per_block)
+    # print(blocks_per_grid)
+    # print(blocks_per_grid* threads_per_block)
+
+    # tmp_result = cuda.device_array(num_centroids)
+
     for i in range(ITERATIONS):
+        # blocks_per_grid = 2048
+        # threads_per_block = ceil(num_points / blocks_per_grid)
+        threads_per_block = 256
+        blocks_per_grid = ceil(num_points / threads_per_block)
         groupByCluster[blocks_per_grid, threads_per_block](
             arrayP, arrayPcluster,
-            arrayC,
-            num_points, num_centroids, tmp_result
+            arrayC, arrayCsum, arrayCnumpoint,
+            num_points, num_centroids
         )
         # groupByCluster2[blocks_per_grid, threads_per_block](tmp_result, arrayPcluster)
         cuda.synchronize()
-        print(arrayPcluster[0:100])
+        # print(arrayPcluster[0:100])
         
-        calCentroidsSum(
-            arrayP, arrayPcluster,
-            arrayCsum, arrayCnumpoint,
-            num_points, num_centroids
-        )
-
+        # calCentroidsSum(
+        #     arrayP, arrayPcluster,
+        #     arrayCsum, arrayCnumpoint,
+        #     num_points, num_centroids
+        # )
+        arrayC_h = arrayC.copy_to_host()
+        arrayCsum_h = arrayCsum.copy_to_host()
+        arrayCnumpoint_h = arrayCnumpoint.copy_to_host()
         updateCentroids(
-            arrayC, arrayCsum, arrayCnumpoint,
+            arrayC_h, arrayCsum_h, arrayCnumpoint_h,
             num_centroids
         )
-
     return arrayC, arrayCsum, arrayCnumpoint
